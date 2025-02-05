@@ -1,0 +1,5 @@
+numpy==1.23.3
+onnxruntime-openvino
+pathlib
+openvino
+opencv-python-headless

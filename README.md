@@ -1,3 +1,160 @@
+# Using Hailo AI accelarator with Nvidia triton server
+
+We can leverage the triton server's python backend to customize it for use with ONNX Runtime and [hailo-8 AI processor](https://hailo.ai/products/ai-accelerators/hailo-8-ai-accelerator/?gad_source=1#hailo8-overview) or [intel OpenVINO compatible Devices](https://docs.openvino.ai/2024/about-openvino/compatibility-and-support/supported-devices.html).
+
+*THE WHY*??
+
+With the flexibility provided by the tritonserver python backend we can essentially run a chain of custom business logic required for our inference requests, example preprocessing and postprocessing for inference requests, chaining inference on different hardware, etc.
+
+We can also customise our custom docker image to include necessary dependancies like Intel openVino:
+
+- HAILO drivers and runtime
+- python backend
+- Onnxruntime backend
+- Onnxruntime with [OpenVINO Execution Provider](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html)
+- intel igpu drivers
+- python libraries as listed in [requirements](./hailo/requirements.txt) or [requirements-gpu](./hailo/requirements-gpu.txt)
+
+## Building the triton server for hailo
+
+Create the docker file using triton server build tool, this should create a base dockerfile in the build folder.
+This file can be used as base to customise like [Dockefile.hailo_cpu](./Dockerfile.hailo_cpu)
+
+### 1. Download hailo dependancies
+
+Register and download the latest hailort drivers from [Hailo.ai developer-zone](https://hailo.ai/developer-zone/software-downloads/) and save it to [hailo/deps](./hailo/deps/)
+
+### 2. Build
+
+#### 2.a. **FOR CPU only**
+
+We **NEED** to build the tritonserver base image first before we build [Dockefile.hailo_cpu](./Dockerfile.hailo_cpu).
+
+```bash
+python build.py \
+  --backend onnxruntime \
+  --backend python \
+  --endpoint grpc \
+  --endpoint http \
+  --filesystem s3 \
+  --enable-logging \
+  --enable-stats \
+  --enable-metrics \
+  --enable-cpu-metrics \
+  --enable-tracing
+```
+
+Now Build hailo triton server CPU-ONLY image using
+
+```bash
+docker build -t hailo-triton-server:r24.05-hailo4.19 -f Dockerfile.hailo_cpu .
+```
+
+#### 2.b. **FOR GPU support**
+
+We can use the existing base image offered by Nvidia like nvcr.io/nvidia/tritonserver:24.05-py3-min or build from scratch using following command
+
+```bash
+python build.py \
+  --backend onnxruntime \
+  --backend python \
+  --backend pytorch \
+  --endpoint grpc \
+  --endpoint http \
+  --filesystem s3 \
+  --enable-logging \
+  --enable-stats \
+  --enable-metrics \
+  --enable-cpu-metrics \
+  --enable-tracing \
+  --enable-gpu \
+  --enable-gpu-metrics
+```
+
+Use the following command to build hailo triton server for use with Nvidia GPUs
+
+```bash
+docker build -t hailo-triton-server:r24.05-hailo4.19-gpu-py310 -f Dockerfile.hailo_gpu-py310 .
+```
+
+**Note**: the built image *hailo-4.19-gpu-py310* is ONLY compatible with CUDA >=12.0 [ref: Nvidia framework-matrix-2024](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html#framework-matrix-2024)
+
+## Test the docker image
+
+Test if tritonserver was built successfully
+
+```bash
+docker run \
+  --rm hailo-triton-server:r24.05-hailo4.19 tritonserver \
+  --help
+```
+
+Test if container can access halio device
+
+```bash
+docker run \
+  --rm \
+  --device=/dev/hailo0:/dev/hailo0 \
+  hailo-triton-server:r24.05-hailo4.19 hailortcli fw-control identify
+```
+
+Test if the container can access Intel openvino chips
+
+```bash
+docker run \
+  --rm -it \
+  --privileged \
+  --device=/dev/dri:/dev/dri \
+  --device=/dev/hailo0:/dev/hailo0 \
+  hailo-triton-server:r24.05-hailo4.19 intel_gpu_top
+```
+
+## Running the container
+
+*NOTE: Host should have the same version of hailo pcie driver installed*
+
+Create a model repository as shown [Triton Model Repository layout](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/model_repository.html#repository-layout)
+
+With Hailo and intel igpu
+
+```bash
+docker run \
+  --rm \
+  --name hailo-triton-server \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  --shm-size=2g \
+  --device=/dev/hailo0:/dev/hailo0 \
+  --device=/dev/dri:/dev/dri \
+  -v /models/triton/<path to models-repository>:/app/data/models/triton:rw \
+  -p 8001:8001 \
+  -p 8002:8002 \
+  hailo-triton-server:r24.05-hailo4.19 tritonserver \
+  --model-repository="/app/data/models/triton"
+
+```
+
+With hailo and nvidia GPU:
+
+```bash
+docker run \
+  --rm \
+  --name hailo-triton \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  --shm-size=2g \
+  --device=/dev/hailo0:/dev/hailo0 \
+  --gpus=all \
+  -v /models/triton/<path to models-repository>:/app/data/models/triton:rw \
+  -p 8001:8001 \
+  -p 8002:8002 \
+  docker.io/library/hailo-triton-server:r24.05-hailo4.19-gpu-py310 tritonserver \
+  --model-repository="/app/data/models/triton" 
+
+```
+
+---
+
 <!--
 # Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
@@ -104,6 +261,7 @@ Image '/workspace/images/mug.jpg':
     13.224326 (968) = CUP
     10.422965 (505) = COFFEEPOT
 ```
+
 Please read the [QuickStart](docs/getting_started/quickstart.md) guide for additional information
 regarding this example. The quickstart guide also contains an example of how to launch Triton on [CPU-only systems](docs/getting_started/quickstart.md#run-on-cpu-only-system). New to Triton and wondering where to get started? Watch the [Getting Started video](https://youtu.be/NQDtfSi5QF4).
 
@@ -238,6 +396,7 @@ We appreciate any feedback, questions or bug reporting regarding this project.
 When posting [issues in GitHub](https://github.com/triton-inference-server/server/issues),
 follow the process outlined in the [Stack Overflow document](https://stackoverflow.com/help/mcve).
 Ensure posted examples are:
+
 - minimal – use as little code as possible that still produces the
   same problem
 - complete – provide all parts needed to reproduce the problem. Check

@@ -1,0 +1,3 @@
+numpy==1.23.3
+pathlib
+opencv-python-headless
