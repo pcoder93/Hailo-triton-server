@@ -85,7 +85,7 @@ Test if tritonserver was built successfully
 
 ```bash
 docker run \
-  --rm hailo-triton-server:r24.05-hailo4.19 tritonserver \
+  --rm pcoder93/hailo-triton-server:r24.05-hailo4.19 tritonserver \
   --help
 ```
 
@@ -95,7 +95,7 @@ Test if container can access halio device
 docker run \
   --rm \
   --device=/dev/hailo0:/dev/hailo0 \
-  hailo-triton-server:r24.05-hailo4.19 hailortcli fw-control identify
+  pcoder93/hailo-triton-server:r24.05-hailo4.19 hailortcli fw-control identify
 ```
 
 Test if the container can access Intel openvino chips
@@ -106,7 +106,7 @@ docker run \
   --privileged \
   --device=/dev/dri:/dev/dri \
   --device=/dev/hailo0:/dev/hailo0 \
-  hailo-triton-server:r24.05-hailo4.19 intel_gpu_top
+  pcoder93/hailo-triton-server:r24.05-hailo4.19 intel_gpu_top
 ```
 
 ## Running the container
@@ -129,7 +129,7 @@ docker run \
   -v /models/triton/<path to models-repository>:/app/data/models/triton:rw \
   -p 8001:8001 \
   -p 8002:8002 \
-  hailo-triton-server:r24.05-hailo4.19 tritonserver \
+  pcoder93/hailo-triton-server:r24.05-hailo4.19 tritonserver \
   --model-repository="/app/data/models/triton"
 
 ```
@@ -148,9 +148,39 @@ docker run \
   -v /models/triton/<path to models-repository>:/app/data/models/triton:rw \
   -p 8001:8001 \
   -p 8002:8002 \
-  docker.io/library/hailo-triton-server:r24.05-hailo4.19-gpu-py310 tritonserver \
+  pcoder93/hailo-triton-server:r24.05-hailo4.19-gpu-py310 tritonserver \
   --model-repository="/app/data/models/triton" 
 
+```
+
+### Using Triton Server on Raspberrypi
+
+Nvidia provides prebuilt [triton server images](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver/layers) for arm devices like Nvidia Jetson Nano. We can use these as base to build.
+
+Create a builder
+
+```bash
+docker buildx create --name archbuilder --use
+```
+
+Build image
+
+```bash
+docker buildx build \ 
+  --platform linux/arm64 \
+  -t pcoder93/hailo-triton-server:r24.06-hailort4.20-arm64 \
+  --load \ 
+  -f Dockerfile.hailo_cpu_arm64 .
+```
+
+Testing the image
+
+```bash
+docker run --rm -it \
+  --platform linux/arm64 \
+  pcoder93/hailo-triton-server:r24.06-hailort4.20-arm64 \ 
+  -v <path to models>:/app/data/models \
+  tritonserver --model-repository /app/data/models
 ```
 
 ---
