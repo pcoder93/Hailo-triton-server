@@ -1,0 +1,31 @@
+name: "hef_model"
+
+backend:"python"
+
+parameters: {
+  key: "preprocess_params"
+  value: {
+    string_value: "{\"normalize\": false, \"channel_first\": false}"
+  }
+}
+
+parameters: {
+  key: "postprocess_params"
+  value: {
+    string_value: "{\"scores\": {\"sigmoid\": true}, \"masks\": {\"sigmoid\": false, \"resize\": true, \"blend\": true, \"transpose\": true, \"denormalize\": true}}"
+  }
+}
+
+parameters: {
+  key: "py_onnx"
+  value: {
+    string_value: "{\"providers\": [\"OpenVINOExecutionProvider\",\"CUDAExecutionProvider\"], \"provider_options\":[{\"device_type\":\"GPU\"},{}]}"
+  }
+}
+
+instance_group [
+    {
+      count: 1
+      kind: KIND_CPU
+    }
+  ]

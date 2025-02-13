@@ -1,4 +1,4 @@
-# Using Hailo AI accelarator with Nvidia triton server
+# Using Hailo AI accelerator with Nvidia Triton Server
 
 We can leverage the triton server's python backend to customize it for use with ONNX Runtime and [hailo-8 AI processor](https://hailo.ai/products/ai-accelerators/hailo-8-ai-accelerator/?gad_source=1#hailo8-overview) or [intel OpenVINO compatible Devices](https://docs.openvino.ai/2024/about-openvino/compatibility-and-support/supported-devices.html).
 
@@ -14,6 +14,10 @@ We can also customise our custom docker image to include necessary dependancies 
 - Onnxruntime with [OpenVINO Execution Provider](https://onnxruntime.ai/docs/execution-providers/OpenVINO-ExecutionProvider.html)
 - intel igpu drivers
 - python libraries as listed in [requirements](./hailo/requirements.txt) or [requirements-gpu](./hailo/requirements-gpu.txt)
+
+## Sample model repository
+
+Please refer [sample_models](hailo/sample_models/). It consists of a template [hef_model](hailo/sample_models/hef_model) with [models.py](hailo/sample_models/hef_model/1/model.py) which can be used with the triton server python backend for inference.
 
 ## Building the triton server for hailo
 
